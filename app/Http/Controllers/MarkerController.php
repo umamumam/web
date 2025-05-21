@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Marker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class MarkerController extends Controller
 {
@@ -22,17 +23,23 @@ class MarkerController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            // 'unique_code' => 'required|unique:markers', // Hapus baris ini
-            'photo' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'video' => 'required|mimes:mp4,mov,ogg,webm|max:20480',
-            'description' => 'nullable'
+            'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'video' => 'required|mimes:mp4|max:20480', // 20MB max
+            'description' => 'nullable|string'
         ]);
 
-        $photoPath = $request->file('photo')->store('marker_images', 'public');
-        $videoPath = $request->file('video')->store('marker_videos', 'public');
+        // Generate unique code
+        $uniqueCode = Str::upper(Str::random(8));
+        while (Marker::where('unique_code', $uniqueCode)->exists()) {
+            $uniqueCode = Str::upper(Str::random(8));
+        }
+
+        // Store files
+        $photoPath = $request->file('photo')->store('markers', 'public');
+        $videoPath = $request->file('video')->store('videos', 'public');
 
         Marker::create([
-            // 'unique_code' => $request->unique_code, // Hapus baris ini
+            'unique_code' => $uniqueCode,
             'photo_path' => $photoPath,
             'video_path' => $videoPath,
             'description' => $request->description
@@ -43,23 +50,29 @@ class MarkerController extends Controller
 
     public function show(Marker $marker)
     {
-        return view('markers.show', compact('marker'));
+        return view('markers.show', [
+            'marker' => $marker,
+            'photoUrl' => Storage::url($marker->photo_path),
+            'videoUrl' => Storage::url($marker->video_path)
+        ]);
     }
 
     public function scan($code)
     {
         $marker = Marker::where('unique_code', $code)->firstOrFail();
-        return view('markers.scan', compact('marker'));
+
+        return view('markers.scan', [
+            'marker' => $marker,
+            'photoUrl' => Storage::url($marker->photo_path),
+            'videoUrl' => Storage::url($marker->video_path)
+        ]);
     }
+
     public function destroy(Marker $marker)
     {
         // Delete associated files
-        if (Storage::disk('public')->exists($marker->photo_path)) {
-            Storage::disk('public')->delete($marker->photo_path);
-        }
-        if (Storage::disk('public')->exists($marker->video_path)) {
-            Storage::disk('public')->delete($marker->video_path);
-        }
+        Storage::disk('public')->delete($marker->photo_path);
+        Storage::disk('public')->delete($marker->video_path);
 
         $marker->delete();
         return redirect()->route('markers.index')->with('success', 'Marker deleted successfully.');
