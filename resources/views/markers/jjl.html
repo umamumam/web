@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAR Testing</title>
+    <!-- A-Frame dan AR.js -->
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <!-- Bootstrap untuk tampilan lebih baik -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .ar-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .upload-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .instruction {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 50px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container py-5">
+        <h1 class="text-center mb-4">WebAR Testing</h1>
+
+        <div class="upload-section">
+            <h4><i class="bi bi-upload"></i> Upload Marker dan Video</h4>
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="markerUpload" class="form-label">Marker Image (Pattern)</label>
+                    <input type="file" id="markerUpload" class="form-control" accept="image/*">
+                    <div class="mt-2">
+                        <small class="text-muted">Gambar dengan kontras tinggi bekerja lebih baik</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label for="videoUpload" class="form-label">AR Video</label>
+                    <input type="file" id="videoUpload" class="form-control" accept="video/*">
+                </div>
+            </div>
+            <button id="startAR" class="btn btn-primary mt-3">
+                <i class="bi bi-play-fill"></i> Start AR Experience
+            </button>
+        </div>
+
+        <div id="arView" class="ar-container" style="display: none;">
+            <!-- A-Frame Scene akan dimasukkan di sini secara dinamis -->
+        </div>
+    </div>
+
+    <div class="instruction" style="display: none;">
+        Arahkan kamera ke marker yang diupload
+    </div>
+
+    <script>
+        document.getElementById('startAR').addEventListener('click', function() {
+            const markerFile = document.getElementById('markerUpload').files[0];
+            const videoFile = document.getElementById('videoUpload').files[0];
+
+            if (!markerFile || !videoFile) {
+                alert('Silakan upload marker dan video terlebih dahulu!');
+                return;
+            }
+
+            // Buat URL objek untuk file yang diupload
+            const markerUrl = URL.createObjectURL(markerFile);
+            const videoUrl = URL.createObjectURL(videoFile);
+
+            // Sembunyikan form upload
+            document.querySelector('.upload-section').style.display = 'none';
+
+            // Tampilkan AR view dan instruksi
+            document.getElementById('arView').style.display = 'block';
+            document.querySelector('.instruction').style.display = 'block';
+
+            // Buat scene AR secara dinamis
+            const arView = document.getElementById('arView');
+            arView.innerHTML = `
+                <a-scene embedded arjs='sourceType: webcam; detectionMode: mono_and_matrix; matrixCodeType: 3x3;'>
+                    <a-marker type='pattern' url='${markerUrl}'>
+                        <a-video src='${videoUrl}' width="1.6" height="0.9" position="0 0.5 0" rotation="-90 0 0"></a-video>
+                    </a-marker>
+                    <a-entity camera></a-entity>
+                </a-scene>
+            `;
+        });
+    </script>
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css">
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
