@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Marker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
+use Symfony\Component\Process\Process;
 
 class MarkerController extends Controller
 {
     public function index()
     {
-        $markers = Marker::all();
+        $markers = Marker::latest()->get();
         return view('markers.index', compact('markers'));
     }
 
@@ -23,58 +23,97 @@ class MarkerController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
-            'video' => 'required|mimes:mp4|max:20480', // 20MB max
-            'description' => 'nullable|string'
+            'photo' => 'required|image',
+            'video' => 'required|mimes:mp4',
+            'description' => 'nullable|string',
         ]);
 
-        // Generate unique code
-        $uniqueCode = Str::upper(Str::random(8));
-        while (Marker::where('unique_code', $uniqueCode)->exists()) {
-            $uniqueCode = Str::upper(Str::random(8));
-        }
+        // Simpan file
+        $photoPath = $request->file('photo')->store('public/markers');
+        $videoPath = $request->file('video')->store('public/videos');
 
-        // Store files
-        $photoPath = $request->file('photo')->store('markers', 'public');
-        $videoPath = $request->file('video')->store('videos', 'public');
-
-        Marker::create([
-            'unique_code' => $uniqueCode,
+        // Simpan ke DB
+        $marker = Marker::create([
             'photo_path' => $photoPath,
             'video_path' => $videoPath,
-            'description' => $request->description
+            'description' => $request->description,
         ]);
 
-        return redirect()->route('markers.index')->with('success', 'Marker created successfully.');
+        // Regenerate .mind file
+        $this->generateMindFile();
+
+        return redirect()->route('markers.index')->with('success', 'Marker created');
     }
 
     public function show(Marker $marker)
     {
-        return view('markers.show', [
-            'marker' => $marker,
-            'photoUrl' => Storage::url($marker->photo_path),
-            'videoUrl' => Storage::url($marker->video_path)
-        ]);
+        return view('markers.show', compact('marker'));
     }
 
-    public function scan($code)
+    public function edit(Marker $marker)
     {
-        $marker = Marker::where('unique_code', $code)->firstOrFail();
+        return view('markers.edit', compact('marker'));
+    }
 
-        return view('markers.scan', [
-            'marker' => $marker,
-            'photoUrl' => Storage::url($marker->photo_path),
-            'videoUrl' => Storage::url($marker->video_path)
+    public function update(Request $request, Marker $marker)
+    {
+        $request->validate([
+            'photo' => 'nullable|image',
+            'video' => 'nullable|mimes:mp4',
+            'description' => 'nullable|string',
         ]);
+
+        if ($request->hasFile('photo')) {
+            Storage::delete($marker->photo_path);
+            $marker->photo_path = $request->file('photo')->store('public/markers');
+        }
+
+        if ($request->hasFile('video')) {
+            Storage::delete($marker->video_path);
+            $marker->video_path = $request->file('video')->store('public/videos');
+        }
+
+        $marker->description = $request->description;
+        $marker->save();
+
+        $this->generateMindFile();
+
+        return redirect()->route('markers.index')->with('success', 'Marker updated');
     }
 
     public function destroy(Marker $marker)
     {
-        // Delete associated files
-        Storage::disk('public')->delete($marker->photo_path);
-        Storage::disk('public')->delete($marker->video_path);
-
+        Storage::delete([$marker->photo_path, $marker->video_path]);
         $marker->delete();
-        return redirect()->route('markers.index')->with('success', 'Marker deleted successfully.');
+
+        $this->generateMindFile();
+
+        return redirect()->route('markers.index')->with('success', 'Marker deleted');
+    }
+
+    private function generateMindFile()
+    {
+        $photos = Marker::pluck('photo_path')->map(function ($path) {
+            return storage_path('app/' . $path);
+        })->toArray();
+
+        $output = storage_path('app/public/targets/output.mind');
+
+        $process = new Process(array_merge([
+            'mindar',
+            'create-image-target',
+            '--input',
+        ], $photos, [
+            '--output',
+            $output,
+        ]));
+
+        $process->run();
+    }
+
+    public function showAR()
+    {
+        $markers = Marker::all();
+        return view('markers.ar', compact('markers'));
     }
 }

@@ -1,41 +1,40 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4">
-    <div class="card shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h4 class="mb-0">Create New Marker</h4>
-            <a href="{{ route('markers.index') }}" class="btn btn-secondary btn-sm">← Back to List</a>
+<div class="container">
+    <h2>Tambah Marker</h2>
+
+    @if ($errors->any())
+        <div class="alert alert-danger">
+            <strong>Ups!</strong> Ada kesalahan input:<br><br>
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
         </div>
-        <div class="card-body">
-            <form action="{{ route('markers.store') }}" method="POST" enctype="multipart/form-data">
-                @csrf
+    @endif
 
-                {{--
-                <div class="mb-3">
-                    <label for="unique_code" class="form-label">Unique Code</label>
-                    <input type="text" name="unique_code" id="unique_code" class="form-control" required>
-                </div>
-                --}}
+    <form action="{{ url('/markers') }}" method="POST" enctype="multipart/form-data">
+        @csrf
 
-                <div class="mb-3">
-                    <label for="photo" class="form-label">Marker Image</label>
-                    <input type="file" name="photo" id="photo" class="form-control" accept="image/*" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="video" class="form-label">AR Video</label>
-                    <input type="file" name="video" id="video" class="form-control" accept="video/*" required>
-                </div>
-
-                <div class="mb-3">
-                    <label for="description" class="form-label">Description <small class="text-muted">(optional)</small></label>
-                    <textarea name="description" id="description" class="form-control" rows="3" placeholder="Enter a description..."></textarea>
-                </div>
-
-                <button type="submit" class="btn btn-primary">Save Marker</button>
-            </form>
+        <div class="mb-3">
+            <label>Foto Marker (JPG)</label>
+            <input type="file" name="photo" class="form-control" required>
         </div>
-    </div>
+
+        <div class="mb-3">
+            <label>Video (MP4)</label>
+            <input type="file" name="video" class="form-control" required>
+        </div>
+
+        <div class="mb-3">
+            <label>Deskripsi</label>
+            <textarea name="description" class="form-control"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Simpan</button>
+        <a href="{{ url('/markers') }}" class="btn btn-secondary">Kembali</a>
+    </form>
 </div>
 @endsection
