@@ -5,13 +5,13 @@ namespace App\Http\Controllers;
 use App\Models\Marker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\Process\Process;
+use Illuminate\Support\Str;
 
 class MarkerController extends Controller
 {
     public function index()
     {
-        $markers = Marker::latest()->get();
+        $markers = Marker::all();
         return view('markers.index', compact('markers'));
     }
 
@@ -23,26 +23,39 @@ class MarkerController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'photo' => 'required|image',
-            'video' => 'required|mimes:mp4',
-            'description' => 'nullable|string',
+            'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'video' => 'required|mimes:mp4|max:20480',
+            'description' => 'nullable|string'
         ]);
 
-        // Simpan file
-        $photoPath = $request->file('photo')->store('public/markers');
-        $videoPath = $request->file('video')->store('public/videos');
+        // Generate unique code
+        $uniqueCode = Str::upper(Str::random(8));
+        while (Marker::where('unique_code', $uniqueCode)->exists()) {
+            $uniqueCode = Str::upper(Str::random(8));
+        }
 
-        // Simpan ke DB
-        $marker = Marker::create([
-            'photo_path' => $photoPath,
-            'video_path' => $videoPath,
-            'description' => $request->description,
+        // Get next number for files
+        $nextMarkerNumber = Marker::count() + 1;
+
+        // Store files with sequential names
+        $photoExtension = $request->file('photo')->extension();
+        $videoExtension = $request->file('video')->extension();
+
+        $photoName = 'marker' . $nextMarkerNumber . '.' . $photoExtension;
+        $videoName = 'video' . $nextMarkerNumber . '.' . $videoExtension;
+
+        // Store files with custom names
+        $photoPath = $request->file('photo')->storeAs('markers', $photoName, 'public');
+        $videoPath = $request->file('video')->storeAs('videos', $videoName, 'public');
+
+        Marker::create([
+            'unique_code' => $uniqueCode,
+            'photo_path' => 'markers/' . $photoName,
+            'video_path' => 'videos/' . $videoName,
+            'description' => $request->description
         ]);
 
-        // Regenerate .mind file
-        $this->generateMindFile();
-
-        return redirect()->route('markers.index')->with('success', 'Marker created');
+        return redirect()->route('markers.index')->with('success', 'Marker created successfully.');
     }
 
     public function show(Marker $marker)
@@ -58,57 +71,55 @@ class MarkerController extends Controller
     public function update(Request $request, Marker $marker)
     {
         $request->validate([
-            'photo' => 'nullable|image',
-            'video' => 'nullable|mimes:mp4',
+            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'video' => 'nullable|mimes:mp4|max:20480',
             'description' => 'nullable|string',
         ]);
 
+        $data = ['description' => $request->description];
+        $currentNumber = $marker->id; // Menggunakan ID marker sebagai nomor urut
+
+        // Handle photo update
         if ($request->hasFile('photo')) {
-            Storage::delete($marker->photo_path);
-            $marker->photo_path = $request->file('photo')->store('public/markers');
+            // Delete old photo
+            Storage::disk('public')->delete($marker->photo_path);
+
+            // Generate new photo name
+            $photoExtension = $request->file('photo')->extension();
+            $photoName = 'marker' . $currentNumber . '.' . $photoExtension;
+
+            // Store new photo
+            $photoPath = $request->file('photo')->storeAs('markers', $photoName, 'public');
+            $data['photo_path'] = 'markers/' . $photoName;
         }
 
+        // Handle video update
         if ($request->hasFile('video')) {
-            Storage::delete($marker->video_path);
-            $marker->video_path = $request->file('video')->store('public/videos');
+            // Delete old video
+            Storage::disk('public')->delete($marker->video_path);
+
+            // Generate new video name
+            $videoExtension = $request->file('video')->extension();
+            $videoName = 'video' . $currentNumber . '.' . $videoExtension;
+
+            // Store new video
+            $videoPath = $request->file('video')->storeAs('videos', $videoName, 'public');
+            $data['video_path'] = 'videos/' . $videoName;
         }
 
-        $marker->description = $request->description;
-        $marker->save();
+        $marker->update($data);
 
-        $this->generateMindFile();
-
-        return redirect()->route('markers.index')->with('success', 'Marker updated');
+        return redirect()->route('markers.index')->with('success', 'Marker updated successfully.');
     }
 
     public function destroy(Marker $marker)
     {
-        Storage::delete([$marker->photo_path, $marker->video_path]);
+        // Delete associated files
+        Storage::disk('public')->delete($marker->photo_path);
+        Storage::disk('public')->delete($marker->video_path);
+
         $marker->delete();
-
-        $this->generateMindFile();
-
-        return redirect()->route('markers.index')->with('success', 'Marker deleted');
-    }
-
-    private function generateMindFile()
-    {
-        $photos = Marker::pluck('photo_path')->map(function ($path) {
-            return storage_path('app/' . $path);
-        })->toArray();
-
-        $output = storage_path('app/public/targets/output.mind');
-
-        $process = new Process(array_merge([
-            'mindar',
-            'create-image-target',
-            '--input',
-        ], $photos, [
-            '--output',
-            $output,
-        ]));
-
-        $process->run();
+        return redirect()->route('markers.index')->with('success', 'Marker deleted successfully.');
     }
 
     public function showAR()
