@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Marker extends Model
 {
@@ -12,7 +13,6 @@ class Marker extends Model
 
     protected $fillable = [
         'unique_code',
-        'photo_path',
         'video_path',
         'description',
     ];
@@ -31,7 +31,10 @@ class Marker extends Model
         while (self::where('unique_code', $code)->exists()) {
             $code = Str::upper(Str::random(8));
         }
-
         return $code;
+    }
+    public function photos(): HasMany
+    {
+        return $this->hasMany(Photo::class)->orderBy('order');
     }
 }

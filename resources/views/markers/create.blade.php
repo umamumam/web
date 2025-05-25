@@ -15,26 +15,34 @@
         </div>
     @endif
 
-    <form action="{{ url('/markers') }}" method="POST" enctype="multipart/form-data">
+    <form action="{{ route('markers.store') }}" method="POST" enctype="multipart/form-data">
         @csrf
 
         <div class="mb-3">
-            <label>Foto Marker (JPG)</label>
-            <input type="file" name="photo" class="form-control" required>
+            <label>Foto Marker (JPG/PNG) - Bisa pilih multiple</label>
+            <input type="file" name="photos[]" class="form-control" multiple required>
+            <small class="text-muted">Anda bisa memilih lebih dari satu foto</small>
         </div>
 
         <div class="mb-3">
             <label>Video (MP4)</label>
             <input type="file" name="video" class="form-control" required>
+            <small class="text-muted">Maksimal 20MB</small>
         </div>
 
         <div class="mb-3">
             <label>Deskripsi</label>
-            <textarea name="description" class="form-control"></textarea>
+            <textarea name="description" class="form-control" rows="3"></textarea>
         </div>
 
-        <button type="submit" class="btn btn-primary">Simpan</button>
-        <a href="{{ url('/markers') }}" class="btn btn-secondary">Kembali</a>
+        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{{ route('markers.index') }}" class="btn btn-secondary me-md-2">
+                <i class="bi bi-arrow-left"></i> Kembali
+            </a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Simpan
+            </button>
+        </div>
     </form>
 </div>
 @endsection

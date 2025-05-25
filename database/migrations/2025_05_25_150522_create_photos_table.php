@@ -11,12 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('markers', function (Blueprint $table) {
+        Schema::create('photos', function (Blueprint $table) {
             $table->id();
-            $table->string('unique_code')->unique();
-            // $table->string('photo_path');
-            $table->string('video_path');
-            $table->text('description')->nullable();
+            $table->foreignId('marker_id')->constrained()->onDelete('cascade');
+            $table->string('path');
+            $table->integer('order')->default(0);
             $table->timestamps();
         });
     }
@@ -26,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('markers');
+        Schema::dropIfExists('photos');
     }
 };

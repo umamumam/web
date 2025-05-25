@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Marker;
+use App\Models\Photo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -11,7 +12,7 @@ class MarkerController extends Controller
 {
     public function index()
     {
-        $markers = Marker::all();
+        $markers = Marker::with('photos')->get();
         return view('markers.index', compact('markers'));
     }
 
@@ -23,91 +24,100 @@ class MarkerController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'photo' => 'required|image|mimes:jpeg,png,jpg|max:2048',
+            'photos.*' => 'required|image|mimes:jpeg,png,jpg|max:2048',
             'video' => 'required|mimes:mp4|max:20480',
             'description' => 'nullable|string'
         ]);
 
         // Generate unique code
-        $uniqueCode = Str::upper(Str::random(8));
-        while (Marker::where('unique_code', $uniqueCode)->exists()) {
-            $uniqueCode = Str::upper(Str::random(8));
-        }
+        $uniqueCode = Marker::generateUniqueCode();
 
         // Get next number for files
         $nextMarkerNumber = Marker::count() + 1;
 
-        // Store files with sequential names
-        $photoExtension = $request->file('photo')->extension();
+        // Store video
         $videoExtension = $request->file('video')->extension();
-
-        $photoName = 'marker' . $nextMarkerNumber . '.' . $photoExtension;
         $videoName = 'video' . $nextMarkerNumber . '.' . $videoExtension;
-
-        // Store files with custom names
-        $photoPath = $request->file('photo')->storeAs('markers', $photoName, 'public');
         $videoPath = $request->file('video')->storeAs('videos', $videoName, 'public');
 
-        Marker::create([
+        // Create marker
+        $marker = Marker::create([
             'unique_code' => $uniqueCode,
-            'photo_path' => 'markers/' . $photoName,
             'video_path' => 'videos/' . $videoName,
             'description' => $request->description
         ]);
+
+        // Store photos
+        foreach ($request->file('photos') as $index => $photo) {
+            $photoExtension = $photo->extension();
+            $photoName = 'marker' . $nextMarkerNumber . '_' . ($index + 1) . '.' . $photoExtension;
+            $photoPath = $photo->storeAs('markers', $photoName, 'public');
+
+            Photo::create([
+                'marker_id' => $marker->id,
+                'path' => 'markers/' . $photoName,
+                'order' => $index + 1
+            ]);
+        }
 
         return redirect()->route('markers.index')->with('success', 'Marker created successfully.');
     }
 
     public function show(Marker $marker)
     {
+        $marker->load('photos');
         return view('markers.show', compact('marker'));
     }
 
     public function edit(Marker $marker)
     {
+        $marker->load('photos');
         return view('markers.edit', compact('marker'));
     }
 
     public function update(Request $request, Marker $marker)
     {
         $request->validate([
-            'photo' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'photos.*' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'video' => 'nullable|mimes:mp4|max:20480',
             'description' => 'nullable|string',
         ]);
 
         $data = ['description' => $request->description];
-        $currentNumber = $marker->id; // Menggunakan ID marker sebagai nomor urut
-
-        // Handle photo update
-        if ($request->hasFile('photo')) {
-            // Delete old photo
-            Storage::disk('public')->delete($marker->photo_path);
-
-            // Generate new photo name
-            $photoExtension = $request->file('photo')->extension();
-            $photoName = 'marker' . $currentNumber . '.' . $photoExtension;
-
-            // Store new photo
-            $photoPath = $request->file('photo')->storeAs('markers', $photoName, 'public');
-            $data['photo_path'] = 'markers/' . $photoName;
-        }
+        $currentNumber = $marker->id;
 
         // Handle video update
         if ($request->hasFile('video')) {
-            // Delete old video
             Storage::disk('public')->delete($marker->video_path);
-
-            // Generate new video name
             $videoExtension = $request->file('video')->extension();
             $videoName = 'video' . $currentNumber . '.' . $videoExtension;
-
-            // Store new video
             $videoPath = $request->file('video')->storeAs('videos', $videoName, 'public');
             $data['video_path'] = 'videos/' . $videoName;
         }
 
         $marker->update($data);
+
+        // Handle photo updates
+        if ($request->hasFile('photos')) {
+            // Delete old photos
+            foreach ($marker->photos as $photo) {
+                Storage::disk('public')->delete($photo->path);
+                $photo->delete();
+            }
+
+            // Store new photos
+            foreach ($request->file('photos') as $index => $photo) {
+                $photoExtension = $photo->extension();
+                $photoName = 'marker' . $currentNumber . '_' . ($index + 1) . '.' . $photoExtension;
+                $photoPath = $photo->storeAs('markers', $photoName, 'public');
+
+                Photo::create([
+                    'marker_id' => $marker->id,
+                    'path' => 'markers/' . $photoName,
+                    'order' => $index + 1
+                ]);
+            }
+        }
 
         return redirect()->route('markers.index')->with('success', 'Marker updated successfully.');
     }
@@ -115,8 +125,10 @@ class MarkerController extends Controller
     public function destroy(Marker $marker)
     {
         // Delete associated files
-        Storage::disk('public')->delete($marker->photo_path);
         Storage::disk('public')->delete($marker->video_path);
+        foreach ($marker->photos as $photo) {
+            Storage::disk('public')->delete($photo->path);
+        }
 
         $marker->delete();
         return redirect()->route('markers.index')->with('success', 'Marker deleted successfully.');
@@ -124,7 +136,7 @@ class MarkerController extends Controller
 
     public function showAR()
     {
-        $markers = Marker::all();
+        $markers = Marker::with('photos')->get();
         return view('markers.ar', compact('markers'));
     }
 }
