@@ -7,7 +7,7 @@
 </head>
 
 <body>
-  <a-scene mindar-image="imageTargetSrc: assets/targets1.mind; autoStart: true;" embedded color-space="sRGB"
+  <a-scene mindar-image="imageTargetSrc: /storage/markers/targets.mind; autoStart: true;" embedded color-space="sRGB"
     renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false"
     device-orientation-permission-ui="enabled: false">
     <a-assets>

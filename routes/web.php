@@ -18,5 +18,12 @@ Route::get('/', function () {
 //         ]);
 //     });
 // })->where('file', '.*');
-Route::resource('markers', MarkerController::class);
 Route::get('/ar/scan', [MarkerController::class, 'showAR']);
+// Route::post('/markers/upload-mind', [MarkerController::class, 'uploadMindFile'])->name('markers.upload-mind');
+Route::prefix('markers')->group(function () {
+    // ... routes existing lainnya ...
+
+    Route::get('/upload-mind', [MarkerController::class, 'showMindUploadForm'])->name('markers.upload-mind-form');
+    Route::post('/upload-mind', [MarkerController::class, 'uploadMindFile'])->name('markers.upload-mind');
+});
+Route::resource('markers', MarkerController::class);

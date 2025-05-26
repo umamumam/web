@@ -7,6 +7,7 @@ use App\Models\Photo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\File;
 
 class MarkerController extends Controller
 {
@@ -138,5 +139,62 @@ class MarkerController extends Controller
     {
         $markers = Marker::with('photos')->get();
         return view('markers.ar', compact('markers'));
+    }
+
+    public function uploadMindFile(Request $request)
+    {
+        $request->validate([
+            'mind_file' => 'required|file|mimetypes:application/octet-stream|max:102400', // 100MB max
+        ]);
+
+        try {
+            $directory = 'markers'; // This will go to storage/app/public/markers
+            $fileName = 'targets.mind';
+
+            // 1. Delete existing file if it exists
+            if (Storage::disk('public')->exists("$directory/$fileName")) {
+                Storage::disk('public')->delete("$directory/$fileName");
+            }
+
+            // 2. Store the new file using the same pattern as in store()
+            $path = $request->file('mind_file')->storeAs($directory, $fileName, 'public');
+
+            // 3. Verify the file was stored
+            if (!Storage::disk('public')->exists($path)) {
+                throw new \Exception("File failed to save after upload");
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'File .mind berhasil diupload!',
+                'path' => $path,
+                'public_url' => asset(Storage::url($path)), // Generate public URL
+                'file_info' => [
+                    'size' => round(Storage::disk('public')->size($path) / (1024 * 1024), 2) . ' MB',
+                    'modified_at' => date('Y-m-d H:i:s', Storage::disk('public')->lastModified($path))
+                ]
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'GAGAL: ' . $e->getMessage(),
+                'debug' => [
+                    'storage_writable' => is_writable(storage_path('app/public')),
+                    'public_writable' => is_writable(public_path('storage'))
+                ]
+            ], 500);
+        }
+    }
+
+    public function showMindUploadForm()
+    {
+        $currentFile = storage_path('targets.mind');
+        $fileExists = file_exists($currentFile);
+
+        return view('markers.upload_mind', [
+            'fileExists' => $fileExists,
+            'lastModified' => $fileExists ? date('Y-m-d H:i:s', filemtime($currentFile)) : null,
+            'fileSize' => $fileExists ? round(filesize($currentFile) / (1024 * 1024), 2) . ' MB' : null
+        ]);
     }
 }
